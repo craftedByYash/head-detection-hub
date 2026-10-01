@@ -1,0 +1,44 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyd
+
+# Environments and Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+*.env
+
+# Large Models & Trained Weights (PROTECTED: Do not commit models to GitHub)
+models/*.pt
+models/*.onnx
+models/*.engine
+models/*.bin
+models/*.weights
+!models/.gitkeep
+
+# Uploaded Drone Videos
+uploads/*
+!uploads/.gitkeep
+
+# Processed Output Videos & Temporary Transcodes
+outputs/*
+!outputs/.gitkeep
+temp_raw_*
+
+# IDE and Editor configurations
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs & Temporary debug files
+*.log
+scratch/

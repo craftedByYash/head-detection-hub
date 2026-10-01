@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Drone Head Detection - Model Testing & Comparison Hub</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- Top Navigation Header -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand">
+        <div class="brand-icon">🚁</div>
+        <div>
+          <h1>Drone Head Detection Hub</h1>
+          <p class="subtitle">Object Detection Model Testing, Evaluation & Side-by-Side Comparison</p>
+        </div>
+      </div>
+      <div class="system-status-badge" id="systemDeviceBadge">
+        <span class="status-indicator" id="deviceDot"></span>
+        <span id="deviceLabel">Detecting Device...</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-container">
+
+    <!-- Mode Selector Tabs -->
+    <div class="tabs-wrapper">
+      <div class="mode-tabs">
+        <button class="tab-button active" id="tabSingle" onclick="switchMode('single')">
+          <span class="tab-icon">🎯</span> Single Model Test
+        </button>
+        <button class="tab-button" id="tabCompare" onclick="switchMode('compare')">
+          <span class="tab-icon">⚖️</span> Side-by-Side Comparison
+        </button>
+      </div>
+    </div>
+
+    <!-- Error Alert Banner -->
+    <div class="alert-box error-alert hidden" id="errorAlert">
+      <div class="alert-icon">⚠️</div>
+      <div class="alert-content">
+        <h4 id="errorTitle">Operation Failed</h4>
+        <p id="errorMessage"></p>
+        <div class="error-tip" id="errorTip"></div>
+      </div>
+      <button class="alert-close" onclick="hideErrorAlert()">&times;</button>
+    </div>
+
+    <!-- Configuration Grid: Video Upload + Model & Parameters -->
+    <div class="card-grid">
+
+      <!-- Card 1: Video Upload Area -->
+      <section class="card upload-card">
+        <div class="card-header">
+          <h3>1. Upload Drone Video</h3>
+          <span class="badge badge-subtle">Supported: .mp4, .avi, .mov, .mkv</span>
+        </div>
+
+        <div class="drop-zone" id="dropZone">
+          <input type="file" id="videoFileInput" accept=".mp4,.avi,.mov,.mkv" hidden>
+          <div class="drop-zone-content" id="dropZoneContent">
+            <div class="upload-icon">📹</div>
+            <h4>Upload Drone Video</h4>
+            <p>Drag & drop your aerial/drone video file here, or</p>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('videoFileInput').click()">
+              Choose Video File
+            </button>
+          </div>
+          
+          <!-- Uploading state -->
+          <div class="upload-spinner-wrap hidden" id="uploadSpinner">
+            <div class="spinner"></div>
+            <p id="uploadStatusText">Uploading and inspecting video...</p>
+          </div>
+        </div>
+
+        <!-- Video Info Box (Shown after upload) -->
+        <div class="uploaded-video-info hidden" id="uploadedVideoInfo">
+          <div class="video-meta-row">
+            <div class="video-name-chip">
+              <span class="chip-icon">📄</span>
+              <strong id="metaVideoName">-</strong>
+            </div>
+            <button class="btn btn-xs btn-outline" onclick="resetVideoUpload()">Change Video</button>
+          </div>
+          <div class="meta-stats-grid">
+            <div class="meta-item">
+              <span class="meta-label">Resolution</span>
+              <span class="meta-val" id="metaResolution">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">FPS</span>
+              <span class="meta-val" id="metaFps">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Duration</span>
+              <span class="meta-val" id="metaDuration">-</span>
+            </div>
+            <div class="meta-item">
+              <span class="meta-label">Frames</span>
+              <span class="meta-val" id="metaFrames">-</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Card 2: Model & Detection Parameters -->
+      <section class="card settings-card">
+        <div class="card-header">
+          <h3 id="modelSectionTitle">2. Select Model & Parameters</h3>
+          <div class="card-header-actions">
+            <input type="file" id="modelUploadInput" accept=".pt" hidden onchange="handleModelUpload(event)">
+            <button type="button" class="btn btn-xs btn-secondary" onclick="document.getElementById('modelUploadInput').click()" title="Select a .pt model file to add to models/ folder">
+              📁 + Add .pt Model
+            </button>
+            <button type="button" class="btn btn-xs btn-outline" title="Rescan models/ folder" onclick="loadModels()">
+              ↻ Refresh
+            </button>
+          </div>
+        </div>
+
+        <!-- Single Model Selector with Option Buttons -->
+        <div id="singleModelSelector" class="form-group">
+          <div class="model-select-header">
+            <label>Select Head Detection Model from <code>models/</code>:</label>
+            <span class="text-muted text-xs" id="modelCountLabel">0 models</span>
+          </div>
+
+          <!-- Option Buttons (Radio Tiles) -->
+          <div class="model-option-group" id="modelOptionButtons">
+            <div class="text-muted text-center">Loading models...</div>
+          </div>
+
+          <!-- Synchronized Dropdown Fallback -->
+          <div class="dropdown-sync-wrap">
+            <label for="modelSelect" class="text-xs text-muted">Or choose from dropdown:</label>
+            <select id="modelSelect" class="form-control select-control" onchange="onModelDropdownChange(this.value)">
+              <option value="" disabled selected>Loading available models...</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Side-by-Side Dual Model Selector (Visible in compare mode) -->
+        <div id="compareModelSelector" class="compare-selectors-grid hidden">
+          <div class="form-group">
+            <label for="modelSelectA">Model A (Left)</label>
+            <select id="modelSelectA" class="form-control select-control">
+              <option value="" disabled selected>Select Model A...</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="modelSelectB">Model B (Right)</label>
+            <select id="modelSelectB" class="form-control select-control">
+              <option value="" disabled selected>Select Model B...</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Parameters Grid -->
+        <div class="params-grid">
+          <!-- Confidence Threshold -->
+          <div class="form-group">
+            <div class="slider-header">
+              <label for="confSlider">Confidence Threshold</label>
+              <span class="slider-value" id="confValue">0.25</span>
+            </div>
+            <input type="range" id="confSlider" min="0.05" max="0.95" step="0.01" value="0.25" class="slider-control" oninput="updateConfDisplay(this.value)">
+            <div class="slider-hints">
+              <span>0.05 (High Recall)</span>
+              <span>0.95 (High Precision)</span>
+            </div>
+          </div>
+
+          <!-- IoU Threshold -->
+          <div class="form-group">
+            <div class="slider-header">
+              <label for="iouSlider">IoU NMS Threshold</label>
+              <span class="slider-value" id="iouValue">0.45</span>
+            </div>
+            <input type="range" id="iouSlider" min="0.10" max="0.95" step="0.05" value="0.45" class="slider-control" oninput="updateIouDisplay(this.value)">
+            <div class="slider-hints">
+              <span>0.10 (Strict NMS)</span>
+              <span>0.95 (Permissive)</span>
+            </div>
+          </div>
+
+          <!-- Inference Device -->
+          <div class="form-group">
+            <label for="deviceSelect">Inference Device</label>
+            <select id="deviceSelect" class="form-control select-control">
+              <option value="auto" selected>Auto (CUDA if available, else CPU)</option>
+              <option value="cuda">CUDA GPU</option>
+              <option value="cpu">CPU Only</option>
+            </select>
+          </div>
+
+          <!-- Processing Range / Frame Limit -->
+          <div class="form-group">
+            <label for="frameLimitSelect">Processing Range</label>
+            <select id="frameLimitSelect" class="form-control select-control">
+              <option value="0" selected>Full Video (All Frames)</option>
+              <option value="60">⚡ Quick Test: First 60 Frames</option>
+              <option value="150">⚡ Quick Test: First 150 Frames</option>
+              <option value="300">🔍 Preview: First 300 Frames</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Execution Action Button -->
+        <div class="action-btn-row">
+          <button id="runBtn" class="btn btn-primary btn-large" onclick="handleRunDetection()">
+            <span class="btn-icon" id="runBtnIcon">🚀</span>
+            <span id="runBtnText">Run Head Detection</span>
+          </button>
+        </div>
+      </section>
+
+    </div>
+
+    <!-- Section 3: Live Progress Indicator (Shown while processing) -->
+    <section class="card progress-card hidden" id="progressCard">
+      <div class="progress-header-row">
+        <div class="progress-title-wrap">
+          <div class="spinner-small" id="progressSpinner"></div>
+          <div>
+            <h4 id="progressStatusHeader">Processing video...</h4>
+            <p class="text-muted" id="progressStatusMessage">Loading model weights...</p>
+          </div>
+        </div>
+        <div class="progress-percent" id="progressPercent">0%</div>
+      </div>
+
+      <!-- Animated Progress Bar -->
+      <div class="progress-track">
+        <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+      </div>
+
+      <!-- Live Metric Badges -->
+      <div class="live-metrics-row">
+        <div class="live-metric">
+          <span class="lm-label">Frame</span>
+          <span class="lm-value" id="liveFrame">- / -</span>
+        </div>
+        <div class="live-metric">
+          <span class="lm-label">Elapsed Time</span>
+          <span class="lm-value" id="liveElapsed">0.0s</span>
+        </div>
+        <div class="live-metric">
+          <span class="lm-label">Inference Speed</span>
+          <span class="lm-value" id="liveFps">- FPS</span>
+        </div>
+        <div class="live-metric actions-metric">
+          <button class="btn btn-xs btn-danger-outline" onclick="cancelCurrentJob()">⏹ Abort Job</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 4: Single Model Result Display -->
+    <section class="card results-card hidden" id="singleResultCard">
+      <div class="card-header">
+        <h3>Processed Output Video</h3>
+        <a id="downloadResultBtn" href="#" download class="btn btn-secondary btn-sm">
+          ⬇ Download Output Video
+        </a>
+      </div>
+
+      <div class="result-layout">
+        <!-- Video Player Column -->
+        <div class="video-player-column">
+          <div class="video-player-container">
+            <video id="processedVideoPlayer" controls playsinline preload="auto" class="result-video">
+              Your browser does not support the video tag.
+            </video>
+          </div>
+
+          <!-- Video Controls & Big Download Action -->
+          <div class="video-player-actions">
+            <div class="speed-controls">
+              <span class="text-xs text-muted">Playback Speed:</span>
+              <button type="button" class="btn btn-xs btn-outline speed-btn" onclick="setPlaybackSpeed(0.5, this)">0.5x</button>
+              <button type="button" class="btn btn-xs btn-outline speed-btn active" onclick="setPlaybackSpeed(1.0, this)">1.0x</button>
+              <button type="button" class="btn btn-xs btn-outline speed-btn" onclick="setPlaybackSpeed(1.5, this)">1.5x</button>
+              <button type="button" class="btn btn-xs btn-outline speed-btn" onclick="setPlaybackSpeed(2.0, this)">2.0x</button>
+            </div>
+
+            <!-- Big Download Button -->
+            <a id="downloadResultBtnLarge" href="#" download class="btn btn-primary btn-large-download">
+              <span class="btn-icon">📥</span> Download Processed Video (.mp4)
+            </a>
+          </div>
+        </div>
+
+        <!-- Detection Statistics Panel -->
+        <div class="statistics-panel">
+          <div class="stats-panel-header">
+            <h4>Detection Results</h4>
+            <span class="stats-panel-badge" id="statsModelBadge">model.pt</span>
+          </div>
+
+          <div class="stats-list">
+            <div class="stats-row">
+              <span class="stats-key">Model</span>
+              <span class="stats-val" id="statModel">-</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-key">Video</span>
+              <span class="stats-val" id="statVideo">-</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-key">Resolution</span>
+              <span class="stats-val" id="statResolution">-</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-key">FPS</span>
+              <span class="stats-val" id="statFps">-</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-key">Duration</span>
+              <span class="stats-val" id="statDuration">-</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-key">Total Frames</span>
+              <span class="stats-val" id="statTotalFrames">-</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-key">Frames Processed</span>
+              <span class="stats-val" id="statFramesProcessed">-</span>
+            </div>
+            <div class="stats-row highlight-stat">
+              <span class="stats-key">Total Head Detections</span>
+              <span class="stats-val" id="statTotalDetections">-</span>
+            </div>
+            <div class="stats-row highlight-stat">
+              <span class="stats-key">Average Heads / Frame</span>
+              <span class="stats-val" id="statAvgHeads">-</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-key">Maximum Heads in One Frame</span>
+              <span class="stats-val" id="statMaxHeads">-</span>
+            </div>
+            <div class="stats-row highlight-stat">
+              <span class="stats-key">Average Confidence</span>
+              <span class="stats-val" id="statAvgConfidence">-</span>
+            </div>
+            <div class="stats-row">
+              <span class="stats-key">Processing Time</span>
+              <span class="stats-val" id="statProcessingTime">-</span>
+            </div>
+            <div class="stats-row highlight-stat">
+              <span class="stats-key">Inference FPS</span>
+              <span class="stats-val" id="statInferenceFps">-</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 5: Side-by-Side Comparison Results -->
+    <section class="card results-card hidden" id="compareResultCard">
+      <div class="card-header">
+        <h3>Side-by-Side Model Comparison</h3>
+        <div class="sync-controls">
+          <button class="btn btn-sm btn-primary" id="syncPlayBtn" onclick="toggleSyncPlayback()">
+            ▶ Play Both in Sync
+          </button>
+        </div>
+      </div>
+
+      <div class="compare-dual-grid">
+        <!-- Model A Column -->
+        <div class="compare-column">
+          <div class="compare-col-header">
+            <span class="model-tag tag-a">Model A</span>
+            <h4 id="compareTitleA">model_a.pt</h4>
+            <a id="downloadBtnA" href="#" download class="btn btn-xs btn-outline">⬇ Download</a>
+          </div>
+          <div class="video-player-container">
+            <video id="videoPlayerA" controls playsinline preload="auto" class="result-video">
+              Your browser does not support the video tag.
+            </video>
+          </div>
+          <!-- Stats Summary A -->
+          <div class="compare-stats-card">
+            <div class="compare-stat-item">
+              <span class="cs-label">Total Detections</span>
+              <strong class="cs-val" id="compareDetectionsA">-</strong>
+            </div>
+            <div class="compare-stat-item">
+              <span class="cs-label">Avg Confidence</span>
+              <strong class="cs-val" id="compareConfA">-</strong>
+            </div>
+            <div class="compare-stat-item">
+              <span class="cs-label">Avg Heads/Frame</span>
+              <strong class="cs-val" id="compareAvgHeadsA">-</strong>
+            </div>
+            <div class="compare-stat-item">
+              <span class="cs-label">Max Heads/Frame</span>
+              <strong class="cs-val" id="compareMaxHeadsA">-</strong>
+            </div>
+            <div class="compare-stat-item">
+              <span class="cs-label">Inference FPS</span>
+              <strong class="cs-val" id="compareFpsA">-</strong>
+            </div>
+          </div>
+        </div>
+
+        <!-- Model B Column -->
+        <div class="compare-column">
+          <div class="compare-col-header">
+            <span class="model-tag tag-b">Model B</span>
+            <h4 id="compareTitleB">model_b.pt</h4>
+            <a id="downloadBtnB" href="#" download class="btn btn-xs btn-outline">⬇ Download</a>
+          </div>
+          <div class="video-player-container">
+            <video id="videoPlayerB" controls playsinline preload="auto" class="result-video">
+              Your browser does not support the video tag.
+            </video>
+          </div>
+          <!-- Stats Summary B -->
+          <div class="compare-stats-card">
+            <div class="compare-stat-item">
+              <span class="cs-label">Total Detections</span>
+              <strong class="cs-val" id="compareDetectionsB">-</strong>
+            </div>
+            <div class="compare-stat-item">
+              <span class="cs-label">Avg Confidence</span>
+              <strong class="cs-val" id="compareConfB">-</strong>
+            </div>
+            <div class="compare-stat-item">
+              <span class="cs-label">Avg Heads/Frame</span>
+              <strong class="cs-val" id="compareAvgHeadsB">-</strong>
+            </div>
+            <div class="compare-stat-item">
+              <span class="cs-label">Max Heads/Frame</span>
+              <strong class="cs-val" id="compareMaxHeadsB">-</strong>
+            </div>
+            <div class="compare-stat-item">
+              <span class="cs-label">Inference FPS</span>
+              <strong class="cs-val" id="compareFpsB">-</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 6: Persistent Model Comparison Table -->
+    <section class="card table-card" id="comparisonTableCard">
+      <div class="card-header">
+        <div>
+          <h3>Model Comparison Table</h3>
+          <p class="text-muted subtitle-small">Summary of evaluation runs on the current drone video session</p>
+        </div>
+        <button class="btn btn-xs btn-outline" onclick="clearEvaluationHistory()">Clear History</button>
+      </div>
+
+      <div class="table-responsive">
+        <table class="comparison-table" id="comparisonTable">
+          <thead>
+            <tr>
+              <th>Model</th>
+              <th>Avg Confidence</th>
+              <th>Avg Heads / Frame</th>
+              <th>Max Heads</th>
+              <th>Total Detections</th>
+              <th>Inference FPS</th>
+              <th>Processing Time</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="comparisonTableBody">
+            <tr id="emptyTableRow">
+              <td colspan="8" class="text-center text-muted empty-state">
+                No evaluation runs yet. Upload a drone video and click <strong>Run Head Detection</strong> to generate comparison measurements.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer">
+    <p>Drone Head Detection & Model Testing App &bull; Powered by FastAPI &bull; Ultralytics YOLO &bull; OpenCV</p>
+  </footer>
+
+  <script src="/static/script.js"></script>
+</body>
+</html>
